@@ -1,0 +1,161 @@
+---
+title: "DataAnalytics_assignment10"
+format: html
+editor: visual
+---
+
+# Assignment 10 - Practice ANOVA
+
+## Preliminaries
+
+```{r}
+#Loading packages
+library(tidyverse)
+library(skimr)
+library(ggplot2)
+
+#Loading in dataset
+f <- "https://raw.githubusercontent.com/difiore/ada-datasets/main/AVONETdataset1.csv"
+d <- read_csv(f, col_names = TRUE)
+
+#Winnowing the data
+d <- select(d, Species1, Family1, Order1, Beak.Length_Culmen, Beak.Width, Beak.Depth, Tarsus.Length, Wing.Length, Tail.Length, Mass, Habitat, Migration, Trophic.Level, Trophic.Niche, Primary.Lifestyle, Min.Latitude, Max.Latitude, Centroid.Latitude, Range.Size)
+skim(d)
+```
+
+## Challenge 1
+
+### Step 1
+
+```{r}
+#Make boxplots of log(Mass) in relation to Trophic.Level and Migration behavior type. For each plot, drop from the visualization all species records where the categorical variable of interest is missing from the dataset. Also, you will want to convert the variable Migration (which is scored as a number: “1”, “2”, or “3”) from class numeric to either being classified as a factor or as a character (string) variable.'
+
+#Boxplot of log(Mass) to Trophic.Level
+ggplot(data = d %>% 
+         drop_na(Trophic.Level), aes(x = Trophic.Level, y = log(Mass))) +
+         geom_boxplot()
+
+#Boxplot of log(Mass) to Migration
+ggplot(data = d %>% drop_na(Migration), aes(x = Migration, y = log(Mass))) +
+  geom_boxplot() + 
+```
+
+### Step 2
+
+```{r}
+#Using the lm() function ->  log(Mass) and Trophic.Level
+(Mass_TL <- lm(log(Mass) ~ (Trophic.Level), data= d))
+
+#Using the lm() function -> log(Mass) and Migration
+d1 <- d %>%
+  mutate(Migration = as.character(Migration))
+(Mass_Migr <- lm(log(Mass) ~ (Migration), data= d))
+
+#Examine the output of the resultant linear models. Is log(Mass) associated with either Trophic.Level or Migration category? That is, in the global test of significance, is the F statistic large enough to reject the null hypothesis of an F value of zero?
+
+
+#Given the regression coefficients returned for your Migration model, which Migration categor(ies) are different than the reference level? What level is the reference level? Relevel and assess differences among the remaining pair of Migration categories.
+```
+
+### Step 3
+
+```{r}
+#Conduct a post-hoc Tukey Honest Significant Differences test to also evaluate which Migration categories differ “significantly” from one another
+```
+
+### Step 4
+
+```{r}
+
+```
+
+## Challenge 2
+
+### Step 1
+
+```{r}
+##Create a new variable that is 'relative beak length' = residual of log(Beak.Length_Culmen) ~ log(Mass)
+n <- lm(log(Beak.Length_Culmen)~ log(Mass), data = d)
+d$relbeak <- n$residuals
+##Relative tarsus length = residual of log(Tarsus.Length) ~log(Mass)
+rtl <- lm(log(Tarsus.Length) ~ log(Mass), data =d)
+d$tarsus <- rtl$residuals
+```
+
+### Step 2
+
+```{r}
+#Make a boxplot of relative tarsus length by primary lifestyle
+ggplot(data = d %>% drop_na(Primary.Lifestlye), aes(x = Primary.Lifestyle, y = relTarsus)) +
+  geom_boxplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1))
+#Make a boxplot of relative beak length by trophic niche
+ggplot(data = d %>% drop_na(Trophic.Niche), aes(x = Trophic.Niche, y = beak)) +
+  geom_boxplot() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Step 3
+
+```{r}
+
+```
+
+### Step 4
+
+```{r}
+##LImit data to the Passeriformes (pass)
+d1 <- d %>%
+  filter(Order1 == "Passeriformes") %>%
+  drop_na(Primary.Lifestyle, Trophic.Level) %>%
+  mutate(Primary.Lifestyle = as.factor(Primary.Lifestyle), Trophic.Level = as.factor(Trophic.Level))
+
+#Run one-way ANOVA analyses to look at the association between [1] relative beak length and primary lifestyle and 
+(aov1 <- aov(data = d1, relbeak ~ Primary.Lifestyle))
+##Between 2 relative beak length and trophic niche
+(aov2 <- aov(data =d1, relbeak ~ Trophic.Niche))
+```
+
+### Step 5
+
+```{r}
+#Two-Way ANOVA
+m <- aov(relbeak ~ Primary.Lifestyle + Trophic.Level, data = d1)
+#or
+m <- lm(relbeak ~Primary.Lifestyle + Trophic.Level, data = d1)
+
+summary(m)
+#Each grouping variable independently predict relativebeak length
+```
+
+### Step 6
+
+```{r}
+m <- aov(relbeak ~ Primary.Lifestyle +Trophic.Level + Primary.Lifestyle:Trophic.Level, data = d1)
+#or
+m <- aov(relbeak ~ Primary.Lifestyle*Trophic.Level, data = d1)
+summary(m)
+#Significant interactions
+```
+
+### Step 7
+
+```{r}
+#Visualizing interaction effects (with my 'm' model)
+library(sjPlot)
+library(emmeans)
+plot_model(m, 
+           type = "emm",
+           terms = c("Primary.Lifestyle", "Trophic.Level"))
+#Plot marginal means
+emmip(m, Trophic.Level ~ Primary.Lifestyle, CIs = TRUE)
+#Interpretation -> 
+```
+
+### Step 8
+
+```{r}
+
+```
