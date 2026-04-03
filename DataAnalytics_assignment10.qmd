@@ -28,7 +28,7 @@ skim(d)
 ### Step 1
 
 ```{r}
-#Make boxplots of log(Mass) in relation to Trophic.Level and Migration behavior type. For each plot, drop from the visualization all species records where the categorical variable of interest is missing from the dataset. Also, you will want to convert the variable Migration (which is scored as a number: “1”, “2”, or “3”) from class numeric to either being classified as a factor or as a character (string) variable.'
+#Make boxplots of log(Mass) in relation to Trophic.Level and Migration behavior type
 
 #Boxplot of log(Mass) to Trophic.Level
 ggplot(data = d %>% 
@@ -36,8 +36,10 @@ ggplot(data = d %>%
          geom_boxplot()
 
 #Boxplot of log(Mass) to Migration
-ggplot(data = d %>% drop_na(Migration), aes(x = Migration, y = log(Mass))) +
-  geom_boxplot() + 
+d1 <- d %>%
+  mutate(Migration = as.character(Migration))
+ggplot(data = d1 %>% drop_na(Migration), aes(x = Migration, y = log(Mass))) +
+  geom_boxplot()
 ```
 
 ### Step 2
@@ -47,21 +49,18 @@ ggplot(data = d %>% drop_na(Migration), aes(x = Migration, y = log(Mass))) +
 (Mass_TL <- lm(log(Mass) ~ (Trophic.Level), data= d))
 
 #Using the lm() function -> log(Mass) and Migration
-d1 <- d %>%
-  mutate(Migration = as.character(Migration))
-(Mass_Migr <- lm(log(Mass) ~ (Migration), data= d))
+(Mass_Migr <- lm(log(Mass) ~ (Migration), data= d1))
 
-#Examine the output of the resultant linear models. Is log(Mass) associated with either Trophic.Level or Migration category? That is, in the global test of significance, is the F statistic large enough to reject the null hypothesis of an F value of zero?
-
-
-#Given the regression coefficients returned for your Migration model, which Migration categor(ies) are different than the reference level? What level is the reference level? Relevel and assess differences among the remaining pair of Migration categories.
+#Is log(Mass) associated with either Trophic.Level or Migration category? 
+##There is an association between some trophic levels and mass, particularly the scavengers
+##There is slight, not statitical significant, inverse relation between mass and migration
 ```
 
 ### Step 3
 
 ```{r}
 #Conduct a post-hoc Tukey Honest Significant Differences test to also evaluate which Migration categories differ “significantly” from one another
-migr_aov <- aov(log(Mass) ~ Migration, data = d)
+migr_aov <- aov(log(Mass) ~ Migration, data = d1)
 posthoc <- TukeyHSD(migr_aov, which = "Migration", ordered = FALSE, conf.level = 0.95)
 posthoc  # all age-sex classes differ
 ```
@@ -69,7 +68,25 @@ posthoc  # all age-sex classes differ
 ### Step 4
 
 ```{r}
+#Preliminaries
+set.seed(123)
+n <- 1000 #reps
+d <- d %>%
+  mutate(logM = log(Mass))
 
+#Using the infer package to run the permutation
+library(infer)
+F_permutation <- d %>%
+  specify(logM ~ Trophic.Level) %>%
+  hypothesize(null = "independence") %>%
+  generate(reps = n, type = "permute") %>%
+  calculate(stat = "F")
+visualize(F_permutation)
+
+#Pulling out the p-value from the permutation
+p <- F_permutation %>%
+  get_p_value(obs_stat = F_permutation, direction = "greater")
+p #0.35 -> non-significant
 ```
 
 ## Challenge 2
@@ -103,7 +120,18 @@ ggplot(data = d %>% drop_na(Trophic.Niche), aes(x = Trophic.Niche, y = rel_Beak)
 ### Step 3
 
 ```{r}
+d <- d %>%
+  mutate(logRS = log(d$Range.Size))
+d2 <- d %>%
+  drop_na(Migration)
+histogram(migration$logRS)
+#Quite curvy, needs log transformation
+histogram(log(migration$Range.Size))
 
+#ANOVA analysis  between geographic range size and migration
+GRS_M_aov <- lm(logRS ~ Migration, data = d2)
+summary(GRS_M_aov)
+#There is a correlation between range size and migration
 ```
 
 ### Step 4
@@ -130,7 +158,9 @@ m <- aov(relbeak ~ Primary.Lifestyle + Trophic.Level, data = d1)
 m <- lm(relbeak ~Primary.Lifestyle + Trophic.Level, data = d1)
 
 summary(m)
-#Each grouping variable independently predict relativebeak length
+
+#Based on the model output, what would you conclude about how relative beak length is related to these two variables?
+##Each grouping variable independently predict relativebeak length
 ```
 
 ### Step 6
@@ -140,7 +170,9 @@ m <- aov(relbeak ~ Primary.Lifestyle +Trophic.Level + Primary.Lifestyle:Trophic.
 #or
 m <- aov(relbeak ~ Primary.Lifestyle*Trophic.Level, data = d1)
 summary(m)
-#Significant interactions
+
+#Based on the model output, what would you now conclude about how relative beak length is related to these two variables?
+##Significant interactions between the two variables support the correlation to relative beak size
 ```
 
 ### Step 7
@@ -160,5 +192,12 @@ emmip(m, Trophic.Level ~ Primary.Lifestyle, CIs = TRUE)
 ### Step 8
 
 ```{r}
+sd <- d2 %>%
+  group_by(Migration) %>%
+  summarize(sd = sd(logRS, na.rm = TRUE)) %>%
+  pull(sd)
+(ratio_sd <- max(sd) / min(sd))
+#Ratio -> 1.332764
 
+#Deviated fom normal, so none of this is really statistically valid (whoops)
 ```
